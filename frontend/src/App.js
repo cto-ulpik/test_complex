@@ -6,7 +6,8 @@ import PreguntaList from './components/PreguntaList';
 import PreguntaDetail from './components/PreguntaDetail';
 import SearchBar from './components/SearchBar';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+// Usar ruta relativa en producción, localhost en desarrollo
+const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api');
 
 function App() {
   const [materias, setMaterias] = useState([]);

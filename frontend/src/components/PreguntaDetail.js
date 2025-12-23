@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './PreguntaDetail.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+// Usar ruta relativa en producción, localhost en desarrollo
+const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api');
 
 function PreguntaDetail({ pregunta, onBack }) {
   const [respuestas, setRespuestas] = useState(pregunta.respuestas || []);
