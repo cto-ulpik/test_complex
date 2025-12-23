@@ -151,6 +151,16 @@ function TestPractice({ config, onFinish }) {
     }
   }, [timeStarted]);
 
+  // Función para aleatorizar un array (Fisher-Yates shuffle)
+  const shuffleArray = (array) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
   const fetchPreguntas = async () => {
     try {
       const url = config.materiaId 
@@ -158,7 +168,12 @@ function TestPractice({ config, onFinish }) {
         : `${API_BASE_URL}/preguntas-aleatorias?cantidad=${config.cantidad}`;
       
       const response = await axios.get(url);
-      setPreguntas(response.data);
+      // Aleatorizar las respuestas de cada pregunta
+      const preguntasConRespuestasAleatorias = response.data.map(pregunta => ({
+        ...pregunta,
+        respuestas: shuffleArray(pregunta.respuestas || [])
+      }));
+      setPreguntas(preguntasConRespuestasAleatorias);
       setLoading(false);
     } catch (error) {
       console.error('Error al cargar preguntas:', error);
@@ -260,7 +275,6 @@ function TestPractice({ config, onFinish }) {
                 checked={respuestaSeleccionada === respuesta.id}
                 onChange={() => handleSelectAnswer(currentPregunta.id, respuesta.id)}
               />
-              <span className="option-letter">{respuesta.opcion})</span>
               <span className="option-text">{respuesta.texto}</span>
             </label>
           ))}
