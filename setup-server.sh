@@ -93,8 +93,8 @@ else
     echo "   Sube el archivo y ejecuta: npm run import"
 fi
 
-# 12. Configurar Nginx
-echo "🌐 Configurando Nginx..."
+# 12. Configurar Nginx (sin afectar otros proyectos)
+echo "🌐 Configurando Nginx para complex.ulpik.com..."
 
 # Instalar Nginx si no está instalado
 if ! command -v nginx &> /dev/null; then
@@ -102,7 +102,8 @@ if ! command -v nginx &> /dev/null; then
     apt-get install -y nginx
 fi
 
-# Crear configuración de Nginx
+# Crear configuración de Nginx SOLO para complex.ulpik.com
+# Esto no afectará otros proyectos existentes
 NGINX_CONFIG="/etc/nginx/sites-available/complex.ulpik.com"
 cat > /tmp/nginx-complex.conf << 'NGINX_EOF'
 server {
@@ -131,17 +132,23 @@ server {
 }
 NGINX_EOF
 
-sudo mv /tmp/nginx-complex.conf "$NGINX_CONFIG"
+# Solo crear/actualizar la configuración de complex.ulpik.com
+# No tocar otras configuraciones existentes
+mv /tmp/nginx-complex.conf "$NGINX_CONFIG"
 
-# Habilitar sitio
-sudo ln -sf "$NGINX_CONFIG" /etc/nginx/sites-enabled/
+# Habilitar sitio (solo si no está ya habilitado)
+if [ ! -L /etc/nginx/sites-enabled/complex.ulpik.com ]; then
+    ln -sf "$NGINX_CONFIG" /etc/nginx/sites-enabled/
+fi
 
-# Verificar y recargar Nginx
+# Verificar y recargar Nginx (esto no afecta otros proyectos)
 if nginx -t; then
     systemctl reload nginx
-    echo "✅ Nginx configurado y recargado"
+    echo "✅ Nginx configurado para complex.ulpik.com"
+    echo "✅ Otros proyectos siguen funcionando normalmente"
 else
     echo "❌ Error en configuración de Nginx"
+    echo "   Revisa: nginx -t"
     exit 1
 fi
 
