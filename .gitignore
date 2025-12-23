@@ -1,0 +1,13 @@
+node_modules/
+database/*.db
+database/*.db-journal
+frontend/node_modules/
+frontend/build/
+.DS_Store
+*.log
+.env
+marcado_ia.log
+server.log
+texto_extraido.txt
+*.pdf
+
