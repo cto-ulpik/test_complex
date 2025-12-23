@@ -58,8 +58,9 @@ function App() {
     setSelectedPregunta(pregunta);
   };
 
-  const handleSearch = async (query) => {
-    if (!query.trim()) {
+  const handleSearch = async (query, soloSinRespuesta = false) => {
+    // Si no hay query ni filtro activo, limpiar resultados
+    if (!query.trim() && !soloSinRespuesta) {
       setSearchResults([]);
       setShowSearch(false);
       return;
@@ -67,7 +68,10 @@ function App() {
 
     try {
       const response = await axios.get(`${API_BASE_URL}/buscar`, {
-        params: { q: query }
+        params: { 
+          q: query || '', // Permitir query vacío si el filtro está activo
+          sinRespuesta: soloSinRespuesta ? '1' : '0'
+        }
       });
       setSearchResults(response.data);
       setShowSearch(true);
@@ -283,10 +287,17 @@ function App() {
                   console.error('Error al recargar preguntas:', error);
                 }
               }}
-              onPreguntaDeleted={(preguntaId) => {
-                // Eliminar pregunta del estado local
-                setPreguntas(preguntas.filter(p => p.id !== preguntaId));
+              onPreguntaDeleted={async (preguntaId) => {
+                // Recargar preguntas desde el servidor después de eliminar
                 setSelectedPregunta(null);
+                try {
+                  const response = await axios.get(`${API_BASE_URL}/materias/${selectedMateria}/preguntas-completas`);
+                  setPreguntas(response.data);
+                } catch (error) {
+                  console.error('Error al recargar preguntas:', error);
+                  // Fallback: eliminar del estado local
+                  setPreguntas(preguntas.filter(p => p.id !== preguntaId));
+                }
               }}
             />
           ) : (

@@ -573,37 +573,55 @@ app.get('/api/estadisticas', (req, res) => {
 // Búsqueda de preguntas
 app.get('/api/buscar', (req, res) => {
     const query = req.query.q || '';
+    const soloSinRespuesta = req.query.sinRespuesta === '1';
     
-    if (!query) {
+    // Si no hay query ni filtro, retornar vacío
+    if (!query.trim() && !soloSinRespuesta) {
         res.json([]);
         return;
     }
     
-    db.all(
-        `SELECT p.*, m.nombre as materia_nombre,
+    // Construir la consulta base
+    let sql = `SELECT p.*, m.nombre as materia_nombre,
                 (SELECT json_group_array(
                     json_object('id', r.id, 'opcion', r.opcion, 'texto', r.texto, 'es_correcta', r.es_correcta)
                 ) FROM respuestas r WHERE r.pregunta_id = p.id) as respuestas_json
          FROM preguntas p
          JOIN materias m ON p.materia_id = m.id
-         WHERE p.texto LIKE ? OR m.nombre LIKE ?
-         ORDER BY m.nombre, CAST(p.numero AS INTEGER)
-         LIMIT 50`,
-        [`%${query}%`, `%${query}%`],
-        (err, rows) => {
-            if (err) {
-                res.status(500).json({ error: err.message });
-                return;
-            }
-            
-            const resultados = rows.map(row => ({
-                ...row,
-                respuestas: row.respuestas_json ? JSON.parse(row.respuestas_json) : []
-            }));
-            
-            res.json(resultados);
+         WHERE 1=1`;
+    
+    const params = [];
+    
+    // Si hay query, agregar condición de búsqueda
+    if (query.trim()) {
+        sql += ` AND (p.texto LIKE ? OR m.nombre LIKE ?)`;
+        params.push(`%${query}%`, `%${query}%`);
+    }
+    
+    // Si se solicita solo preguntas sin respuesta correcta
+    if (soloSinRespuesta) {
+        sql += ` AND NOT EXISTS (
+            SELECT 1 FROM respuestas r 
+            WHERE r.pregunta_id = p.id 
+            AND (r.es_correcta = 1 OR r.es_correcta = '1' OR r.es_correcta = true)
+        )`;
+    }
+    
+    sql += ` ORDER BY m.nombre, CAST(p.numero AS INTEGER) LIMIT 50`;
+    
+    db.all(sql, params, (err, rows) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
         }
-    );
+        
+        const resultados = rows.map(row => ({
+            ...row,
+            respuestas: row.respuestas_json ? JSON.parse(row.respuestas_json) : []
+        }));
+        
+        res.json(resultados);
+    });
 });
 
 // Iniciar servidor
