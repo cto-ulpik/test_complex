@@ -5,6 +5,11 @@ import MateriaList from './components/MateriaList';
 import PreguntaList from './components/PreguntaList';
 import PreguntaDetail from './components/PreguntaDetail';
 import SearchBar from './components/SearchBar';
+import TestConfig from './components/TestConfig';
+import TestPractice from './components/TestPractice';
+import TestInstantPractice from './components/TestInstantPractice';
+import TestResults from './components/TestResults';
+import Statistics from './components/Statistics';
 
 // Usar ruta relativa en producción, localhost en desarrollo
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api');
@@ -17,6 +22,10 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [searchResults, setSearchResults] = useState([]);
   const [showSearch, setShowSearch] = useState(false);
+  const [testMode, setTestMode] = useState(null); // 'config', 'practice', 'results'
+  const [testConfig, setTestConfig] = useState(null);
+  const [testResults, setTestResults] = useState(null);
+  const [showStatistics, setShowStatistics] = useState(false);
 
   useEffect(() => {
     fetchMaterias();
@@ -77,6 +86,34 @@ function App() {
     setSelectedPregunta(null);
     setShowSearch(false);
     setSearchResults([]);
+    setTestMode(null);
+    setTestConfig(null);
+    setTestResults(null);
+  };
+
+  const handleStartTest = (config) => {
+    setTestConfig(config);
+    setTestMode('practice');
+    setSelectedMateria(null);
+    setSelectedPregunta(null);
+    setShowSearch(false);
+  };
+
+  const handleTestFinish = (results) => {
+    setTestResults(results);
+    setTestMode('results');
+  };
+
+  const handleTestRestart = () => {
+    setTestMode('config');
+    setTestConfig(null);
+    setTestResults(null);
+  };
+
+  const handleTestBack = () => {
+    setTestMode(null);
+    setTestConfig(null);
+    setTestResults(null);
   };
 
   if (loading) {
@@ -92,11 +129,79 @@ function App() {
       <header className="app-header">
         <h1>Banco de Preguntas</h1>
         <p>Examen Complexivo 2025-2026</p>
+        <div className="header-actions">
+          {!testMode && !showStatistics && (
+            <>
+              <button 
+                className="btn-practice" 
+                onClick={() => setTestMode('config')}
+              >
+                📝 Modo Práctica
+              </button>
+              <button 
+                className="btn-statistics" 
+                onClick={() => setShowStatistics(true)}
+              >
+                📊 Estadísticas
+              </button>
+            </>
+          )}
+          {(testMode || showStatistics) && (
+            <button 
+              className="btn-back-header" 
+              onClick={() => {
+                handleTestBack();
+                setShowStatistics(false);
+              }}
+            >
+              ← Volver al Banco
+            </button>
+          )}
+        </div>
       </header>
 
-      <div className="app-container">
-        <div className="sidebar">
-          <SearchBar onSearch={handleSearch} />
+      {testMode === 'config' && (
+        <div className="app-container test-container">
+          <TestConfig onStartTest={handleStartTest} />
+        </div>
+      )}
+
+      {testMode === 'practice' && testConfig && (
+        <div className="app-container test-container">
+          {testConfig.modo === 'instantanea' ? (
+            <TestInstantPractice 
+              config={testConfig} 
+              onFinish={handleTestFinish}
+            />
+          ) : (
+            <TestPractice 
+              config={testConfig} 
+              onFinish={handleTestFinish}
+            />
+          )}
+        </div>
+      )}
+
+      {testMode === 'results' && (
+        <div className="app-container test-container">
+          <TestResults 
+            results={testResults}
+            onRestart={handleTestRestart}
+            onBack={handleTestBack}
+          />
+        </div>
+      )}
+
+      {showStatistics && (
+        <div className="app-container test-container">
+          <Statistics onBack={() => setShowStatistics(false)} />
+        </div>
+      )}
+
+      {!testMode && !showStatistics && (
+        <div className="app-container">
+          <div className="sidebar">
+            <SearchBar onSearch={handleSearch} />
           
           {!showSearch && (
             <>
@@ -145,11 +250,44 @@ function App() {
             <PreguntaDetail
               pregunta={selectedPregunta}
               onBack={handleBack}
+              onDelete={async (preguntaId) => {
+                // Recargar preguntas después de eliminar
+                try {
+                  const response = await axios.get(`${API_BASE_URL}/materias/${selectedMateria}/preguntas-completas`);
+                  setPreguntas(response.data);
+                } catch (error) {
+                  console.error('Error al recargar preguntas:', error);
+                }
+              }}
+              onUpdate={async () => {
+                // Recargar la pregunta actualizada
+                try {
+                  const response = await axios.get(`${API_BASE_URL}/preguntas/${selectedPregunta.id}`);
+                  setSelectedPregunta({ ...selectedPregunta, ...response.data });
+                } catch (error) {
+                  console.error('Error al recargar pregunta:', error);
+                }
+              }}
             />
           ) : selectedMateria ? (
             <PreguntaList
               preguntas={preguntas}
               onSelect={handlePreguntaSelect}
+              materiaId={selectedMateria}
+              onPreguntaAdded={async () => {
+                // Recargar preguntas después de agregar una nueva
+                try {
+                  const response = await axios.get(`${API_BASE_URL}/materias/${selectedMateria}/preguntas-completas`);
+                  setPreguntas(response.data);
+                } catch (error) {
+                  console.error('Error al recargar preguntas:', error);
+                }
+              }}
+              onPreguntaDeleted={(preguntaId) => {
+                // Eliminar pregunta del estado local
+                setPreguntas(preguntas.filter(p => p.id !== preguntaId));
+                setSelectedPregunta(null);
+              }}
             />
           ) : (
             <div className="welcome">
@@ -165,6 +303,7 @@ function App() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

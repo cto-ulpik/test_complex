@@ -21,6 +21,11 @@
   align-items: center;
 }
 
+.pregunta-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
 .pregunta-detail-header h2 {
   color: #667eea;
   font-size: 1.8rem;
@@ -339,6 +344,103 @@
 
 .btn-cancelar-small:hover {
   background: #c82333;
+}
+
+.btn-eliminar {
+  background: #dc3545;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+
+.btn-eliminar:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.btn-eliminar-respuesta {
+  background: #dc3545;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s;
+}
+
+.btn-eliminar-respuesta:hover:not(:disabled) {
+  background: #c82333;
+  transform: scale(1.05);
+}
+
+.btn-eliminar-respuesta:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.respuestas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.btn-agregar-respuesta {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-agregar-respuesta:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+.btn-agregar-respuesta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.nueva-respuesta-form {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  border: 2px dashed #667eea;
+}
+
+.nueva-respuesta-inputs {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.input-opcion {
+  padding: 0.75rem;
+  border: 2px solid #667eea;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.botones-nueva-respuesta {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .no-respuestas {

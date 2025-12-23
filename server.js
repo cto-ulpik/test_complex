@@ -138,6 +138,119 @@ app.get('/api/materias/:materiaId/preguntas-completas', (req, res) => {
     );
 });
 
+// Endpoint para crear una nueva pregunta
+app.post('/api/preguntas', (req, res) => {
+    const { materia_id, numero, texto } = req.body;
+    
+    if (!materia_id || !texto) {
+        res.status(400).json({ error: 'materia_id y texto son requeridos' });
+        return;
+    }
+    
+    // Obtener el siguiente número de pregunta para la materia
+    db.get(
+        'SELECT COALESCE(MAX(CAST(numero AS INTEGER)), 0) + 1 as siguiente_numero FROM preguntas WHERE materia_id = ?',
+        [materia_id],
+        (err, row) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            
+            const preguntaNumero = numero || row.siguiente_numero;
+            
+            db.run(
+                'INSERT INTO preguntas (materia_id, numero, texto) VALUES (?, ?, ?)',
+                [materia_id, preguntaNumero, texto],
+                function(err) {
+                    if (err) {
+                        res.status(500).json({ error: err.message });
+                        return;
+                    }
+                    
+                    res.json({
+                        success: true,
+                        id: this.lastID,
+                        numero: preguntaNumero,
+                        message: 'Pregunta creada exitosamente'
+                    });
+                }
+            );
+        }
+    );
+});
+
+// Endpoint para eliminar una pregunta
+app.delete('/api/preguntas/:id', (req, res) => {
+    const preguntaId = req.params.id;
+    
+    // Primero eliminar todas las respuestas asociadas
+    db.run('DELETE FROM respuestas WHERE pregunta_id = ?', [preguntaId], (err) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        
+        // Luego eliminar la pregunta
+        db.run('DELETE FROM preguntas WHERE id = ?', [preguntaId], function(err) {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            
+            res.json({
+                success: true,
+                message: 'Pregunta eliminada exitosamente'
+            });
+        });
+    });
+});
+
+// Endpoint para agregar una nueva respuesta a una pregunta
+app.post('/api/preguntas/:id/respuestas', (req, res) => {
+    const preguntaId = req.params.id;
+    const { opcion, texto } = req.body;
+    
+    if (!opcion || !texto) {
+        res.status(400).json({ error: 'opcion y texto son requeridos' });
+        return;
+    }
+    
+    db.run(
+        'INSERT INTO respuestas (pregunta_id, opcion, texto, es_correcta) VALUES (?, ?, ?, 0)',
+        [preguntaId, opcion, texto],
+        function(err) {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            
+            res.json({
+                success: true,
+                id: this.lastID,
+                message: 'Respuesta agregada exitosamente'
+            });
+        }
+    );
+});
+
+// Endpoint para eliminar una respuesta
+app.delete('/api/respuestas/:id', (req, res) => {
+    const respuestaId = req.params.id;
+    
+    db.run('DELETE FROM respuestas WHERE id = ?', [respuestaId], function(err) {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        
+        res.json({
+            success: true,
+            message: 'Respuesta eliminada exitosamente'
+        });
+    });
+});
+
 // Endpoint para actualizar una pregunta
 app.put('/api/preguntas/:preguntaId', (req, res) => {
     const preguntaId = req.params.preguntaId;
@@ -223,6 +336,236 @@ app.put('/api/respuestas/:respuestaId/correcta', (req, res) => {
                 }
                 res.json({ success: true, message: 'Respuesta actualizada' });
             });
+        });
+    });
+});
+
+// Endpoint para obtener total de preguntas con respuesta correcta
+app.get('/api/preguntas-con-respuesta/total', (req, res) => {
+    db.get(
+        'SELECT COUNT(DISTINCT p.id) as total FROM preguntas p JOIN respuestas r ON r.pregunta_id = p.id WHERE (r.es_correcta = 1 OR r.es_correcta = \'1\' OR r.es_correcta = true)',
+        [],
+        (err, row) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            res.json({ total: row.total || 0 });
+        }
+    );
+});
+
+// Endpoint para obtener preguntas aleatorias con respuesta correcta (todas las materias)
+app.get('/api/preguntas-aleatorias', (req, res) => {
+    const cantidad = parseInt(req.query.cantidad) || 10;
+    
+    db.all(
+        `SELECT DISTINCT p.id FROM preguntas p 
+         JOIN respuestas r ON r.pregunta_id = p.id 
+         WHERE (r.es_correcta = 1 OR r.es_correcta = '1' OR r.es_correcta = true)
+         ORDER BY RANDOM()
+         LIMIT ?`,
+        [cantidad],
+        (err, rows) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            
+            if (rows.length === 0) {
+                res.json([]);
+                return;
+            }
+            
+            const preguntaIds = rows.map(r => r.id);
+            const placeholders = preguntaIds.map(() => '?').join(',');
+            
+            // Obtener preguntas completas con respuestas
+            db.all(
+                `SELECT p.*
+                 FROM preguntas p 
+                 WHERE p.id IN (${placeholders})`,
+                preguntaIds,
+                (err, preguntas) => {
+                    if (err) {
+                        res.status(500).json({ error: err.message });
+                        return;
+                    }
+                    
+                    const preguntasPromises = preguntas.map(pregunta => {
+                        return new Promise((resolve, reject) => {
+                            db.all(
+                                'SELECT id, opcion, texto, COALESCE(es_correcta, 0) as es_correcta FROM respuestas WHERE pregunta_id = ? ORDER BY opcion',
+                                [pregunta.id],
+                                (err, respuestas) => {
+                                    if (err) {
+                                        reject(err);
+                                    } else {
+                                        resolve({
+                                            ...pregunta,
+                                            respuestas: respuestas.map(r => {
+                                                // Asegurar que es_correcta sea 0 o 1
+                                                const esCorrecta = r.es_correcta === 1 || r.es_correcta === '1' || r.es_correcta === true ? 1 : 0;
+                                                return {
+                                                    ...r,
+                                                    es_correcta: esCorrecta
+                                                };
+                                            })
+                                        });
+                                    }
+                                }
+                            );
+                        });
+                    });
+                    
+                    Promise.all(preguntasPromises)
+                        .then(preguntasCompletas => {
+                            res.json(preguntasCompletas);
+                        })
+                        .catch(err => {
+                            res.status(500).json({ error: err.message });
+                        });
+                }
+            );
+        }
+    );
+});
+
+// Endpoint para obtener preguntas aleatorias con respuesta correcta por materia
+app.get('/api/materias/:materiaId/preguntas-aleatorias', (req, res) => {
+    const materiaId = req.params.materiaId;
+    const cantidad = parseInt(req.query.cantidad) || 10;
+    
+    db.all(
+        `SELECT DISTINCT p.id FROM preguntas p 
+         JOIN respuestas r ON r.pregunta_id = p.id 
+         WHERE p.materia_id = ? AND (r.es_correcta = 1 OR r.es_correcta = '1' OR r.es_correcta = true)
+         ORDER BY RANDOM()
+         LIMIT ?`,
+        [materiaId, cantidad],
+        (err, rows) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            
+            if (rows.length === 0) {
+                res.json([]);
+                return;
+            }
+            
+            const preguntaIds = rows.map(r => r.id);
+            const placeholders = preguntaIds.map(() => '?').join(',');
+            
+            db.all(
+                `SELECT p.*
+                 FROM preguntas p 
+                 WHERE p.id IN (${placeholders})`,
+                preguntaIds,
+                (err, preguntas) => {
+                    if (err) {
+                        res.status(500).json({ error: err.message });
+                        return;
+                    }
+                    
+                    const preguntasPromises = preguntas.map(pregunta => {
+                        return new Promise((resolve, reject) => {
+                            db.all(
+                                'SELECT id, opcion, texto, COALESCE(es_correcta, 0) as es_correcta FROM respuestas WHERE pregunta_id = ? ORDER BY opcion',
+                                [pregunta.id],
+                                (err, respuestas) => {
+                                    if (err) {
+                                        reject(err);
+                                    } else {
+                                        resolve({
+                                            ...pregunta,
+                                            respuestas: respuestas.map(r => {
+                                                // Asegurar que es_correcta sea 0 o 1
+                                                const esCorrecta = r.es_correcta === 1 || r.es_correcta === '1' || r.es_correcta === true ? 1 : 0;
+                                                return {
+                                                    ...r,
+                                                    es_correcta: esCorrecta
+                                                };
+                                            })
+                                        });
+                                    }
+                                }
+                            );
+                        });
+                    });
+                    
+                    Promise.all(preguntasPromises)
+                        .then(preguntasCompletas => {
+                            res.json(preguntasCompletas);
+                        })
+                        .catch(err => {
+                            res.status(500).json({ error: err.message });
+                        });
+                }
+            );
+        }
+    );
+});
+
+// Endpoint para obtener total de preguntas con respuesta correcta por materia
+app.get('/api/materias/:materiaId/preguntas-con-respuesta', (req, res) => {
+    const materiaId = req.params.materiaId;
+    
+    db.get(
+        `SELECT COUNT(DISTINCT p.id) as total 
+         FROM preguntas p 
+         JOIN respuestas r ON r.pregunta_id = p.id 
+         WHERE p.materia_id = ? AND (r.es_correcta = 1 OR r.es_correcta = '1' OR r.es_correcta = true)`,
+        [materiaId],
+        (err, row) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            res.json({ total: row.total || 0 });
+        }
+    );
+});
+
+// Endpoint para obtener estadísticas generales
+app.get('/api/estadisticas', (req, res) => {
+    // Obtener total de materias
+    db.get('SELECT COUNT(*) as total FROM materias', [], (err, materiasRow) => {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        // Obtener total de preguntas
+        db.get('SELECT COUNT(*) as total FROM preguntas', [], (err, preguntasRow) => {
+            if (err) {
+                res.status(500).json({ error: err.message });
+                return;
+            }
+
+            // Obtener preguntas con respuesta correcta
+            db.get(
+                'SELECT COUNT(DISTINCT p.id) as total FROM preguntas p JOIN respuestas r ON r.pregunta_id = p.id WHERE (r.es_correcta = 1 OR r.es_correcta = \'1\' OR r.es_correcta = true)',
+                [],
+                (err, marcadasRow) => {
+                    if (err) {
+                        res.status(500).json({ error: err.message });
+                        return;
+                    }
+
+                    const totalMaterias = materiasRow.total || 0;
+                    const totalPreguntas = preguntasRow.total || 0;
+                    const preguntasMarcadas = marcadasRow.total || 0;
+                    const preguntasInciertas = totalPreguntas - preguntasMarcadas;
+
+                    res.json({
+                        totalMaterias,
+                        totalPreguntas,
+                        preguntasMarcadas,
+                        preguntasInciertas
+                    });
+                }
+            );
         });
     });
 });

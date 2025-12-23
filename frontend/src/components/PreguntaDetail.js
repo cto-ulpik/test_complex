@@ -5,7 +5,7 @@ import './PreguntaDetail.css';
 // Usar ruta relativa en producción, localhost en desarrollo
 const API_BASE_URL = process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5001/api');
 
-function PreguntaDetail({ pregunta, onBack }) {
+function PreguntaDetail({ pregunta, onBack, onDelete, onUpdate }) {
   const [respuestas, setRespuestas] = useState(pregunta.respuestas || []);
   const [preguntaTexto, setPreguntaTexto] = useState(pregunta.texto || '');
   const [editandoPregunta, setEditandoPregunta] = useState(false);
@@ -13,6 +13,8 @@ function PreguntaDetail({ pregunta, onBack }) {
   const [textoEditado, setTextoEditado] = useState('');
   const [esCorrectaEditada, setEsCorrectaEditada] = useState(false);
   const [updating, setUpdating] = useState(null);
+  const [agregandoRespuesta, setAgregandoRespuesta] = useState(false);
+  const [nuevaRespuesta, setNuevaRespuesta] = useState({ opcion: '', texto: '' });
 
   const handleMarcarCorrecta = async (respuestaId) => {
     setUpdating(respuestaId);
@@ -181,6 +183,93 @@ function PreguntaDetail({ pregunta, onBack }) {
     setEsCorrectaEditada(false);
   };
 
+  const handleEliminarPregunta = async () => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta pregunta? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/preguntas/${pregunta.id}`);
+      if (response.data.success) {
+        alert('Pregunta eliminada exitosamente');
+        if (onDelete) {
+          onDelete(pregunta.id);
+        }
+        onBack();
+      }
+    } catch (error) {
+      console.error('Error al eliminar pregunta:', error);
+      alert('Error al eliminar la pregunta: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleAgregarRespuesta = async () => {
+    if (!nuevaRespuesta.opcion.trim() || !nuevaRespuesta.texto.trim()) {
+      alert('Por favor completa la opción y el texto de la respuesta');
+      return;
+    }
+
+    setUpdating('agregando');
+    try {
+      const response = await axios.post(`${API_BASE_URL}/preguntas/${pregunta.id}/respuestas`, {
+        opcion: nuevaRespuesta.opcion.trim(),
+        texto: nuevaRespuesta.texto.trim()
+      });
+
+      if (response.data.success) {
+        // Agregar la nueva respuesta al estado
+        const nuevaRespuestaObj = {
+          id: response.data.id,
+          pregunta_id: pregunta.id,
+          opcion: nuevaRespuesta.opcion.trim(),
+          texto: nuevaRespuesta.texto.trim(),
+          es_correcta: 0
+        };
+        setRespuestas([...respuestas, nuevaRespuestaObj]);
+        setNuevaRespuesta({ opcion: '', texto: '' });
+        setAgregandoRespuesta(false);
+        alert('Respuesta agregada exitosamente');
+      }
+    } catch (error) {
+      console.error('Error al agregar respuesta:', error);
+      alert('Error al agregar la respuesta: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleEliminarRespuesta = async (respuestaId) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta respuesta?')) {
+      return;
+    }
+
+    setUpdating(respuestaId);
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/respuestas/${respuestaId}`);
+      if (response.data.success) {
+        setRespuestas(respuestas.filter(r => r.id !== respuestaId));
+        alert('Respuesta eliminada exitosamente');
+      }
+    } catch (error) {
+      console.error('Error al eliminar respuesta:', error);
+      alert('Error al eliminar la respuesta: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  // Obtener la siguiente letra disponible para nueva respuesta
+  const getSiguienteOpcion = () => {
+    const opcionesUsadas = respuestas.map(r => r.opcion.toUpperCase());
+    const letras = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    for (const letra of letras) {
+      if (!opcionesUsadas.includes(letra)) {
+        return letra;
+      }
+    }
+    return String.fromCharCode(65 + respuestas.length); // Si se agotan las letras, usar siguiente
+  };
+
   return (
     <div className="pregunta-detail">
       <button className="back-button" onClick={onBack}>
@@ -190,9 +279,14 @@ function PreguntaDetail({ pregunta, onBack }) {
       <div className="pregunta-detail-content">
         <div className="pregunta-detail-header">
           <h2>Pregunta {pregunta.numero}</h2>
-          <button className="btn-editar" onClick={handleEditarPregunta}>
-            ✏️ Editar pregunta
-          </button>
+          <div className="pregunta-actions">
+            <button className="btn-editar" onClick={handleEditarPregunta}>
+              ✏️ Editar pregunta
+            </button>
+            <button className="btn-eliminar" onClick={handleEliminarPregunta}>
+              🗑️ Eliminar pregunta
+            </button>
+          </div>
         </div>
 
         {editandoPregunta ? (
@@ -224,9 +318,63 @@ function PreguntaDetail({ pregunta, onBack }) {
           </div>
         )}
 
-        {respuestas && respuestas.length > 0 ? (
-          <div className="pregunta-respuestas">
+        <div className="pregunta-respuestas">
+          <div className="respuestas-header">
             <h3>Opciones de respuesta:</h3>
+            <button 
+              className="btn-agregar-respuesta" 
+              onClick={() => {
+                setAgregandoRespuesta(true);
+                setNuevaRespuesta({ opcion: getSiguienteOpcion(), texto: '' });
+              }}
+              disabled={agregandoRespuesta}
+            >
+              ➕ Agregar opción
+            </button>
+          </div>
+
+          {agregandoRespuesta && (
+            <div className="nueva-respuesta-form">
+              <div className="nueva-respuesta-inputs">
+                <input
+                  type="text"
+                  className="input-opcion"
+                  value={nuevaRespuesta.opcion}
+                  onChange={(e) => setNuevaRespuesta({ ...nuevaRespuesta, opcion: e.target.value.toUpperCase() })}
+                  placeholder="Opción (A, B, C...)"
+                  maxLength="1"
+                  style={{ width: '60px', textAlign: 'center' }}
+                />
+                <textarea
+                  className="textarea-respuesta"
+                  value={nuevaRespuesta.texto}
+                  onChange={(e) => setNuevaRespuesta({ ...nuevaRespuesta, texto: e.target.value })}
+                  rows="2"
+                  placeholder="Texto de la respuesta..."
+                />
+              </div>
+              <div className="botones-nueva-respuesta">
+                <button 
+                  className="btn-guardar-small" 
+                  onClick={handleAgregarRespuesta}
+                  disabled={updating === 'agregando' || !nuevaRespuesta.opcion.trim() || !nuevaRespuesta.texto.trim()}
+                >
+                  {updating === 'agregando' ? '⏳ Agregando...' : '💾 Agregar'}
+                </button>
+                <button 
+                  className="btn-cancelar-small" 
+                  onClick={() => {
+                    setAgregandoRespuesta(false);
+                    setNuevaRespuesta({ opcion: '', texto: '' });
+                  }}
+                >
+                  ❌ Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {respuestas && respuestas.length > 0 ? (
             <div className="respuestas-list">
               {respuestas.map((respuesta) => {
                 const esCorrecta = respuesta.es_correcta === 1 || respuesta.es_correcta === true;
@@ -308,17 +456,24 @@ function PreguntaDetail({ pregunta, onBack }) {
                             ? '✗ Desmarcar como correcta' 
                             : '✓ Marcar como correcta'}
                       </button>
+                      <button
+                        className="btn-eliminar-respuesta"
+                        onClick={() => handleEliminarRespuesta(respuesta.id)}
+                        disabled={updating === respuesta.id}
+                      >
+                        🗑️ Eliminar
+                      </button>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        ) : (
-          <div className="no-respuestas">
-            <p>Esta pregunta no tiene respuestas disponibles.</p>
-          </div>
-        )}
+          ) : (
+            <div className="no-respuestas">
+              <p>Esta pregunta no tiene respuestas disponibles.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
