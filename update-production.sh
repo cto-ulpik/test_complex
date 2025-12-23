@@ -1,98 +1,134 @@
 #!/bin/bash
 
-# Script de actualización automática en producción
-# Ejecutar en el servidor: bash update-production.sh
-
-set -e
-
-PROJECT_DIR="/var/www/html/test_complex"
-cd "$PROJECT_DIR"
-
-echo "🔄 Actualizando proyecto en producción..."
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║     🚀 ACTUALIZACIÓN DE PRODUCCIÓN                            ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-# 1. Backup de seguridad de la base de datos actual
-echo "💾 Creando backup de seguridad..."
+# Verificar que estamos en el directorio correcto
+if [ ! -f "server.js" ]; then
+    echo "❌ Error: No se encontró server.js"
+    echo "   Asegúrate de estar en el directorio del proyecto:"
+    echo "   cd /var/www/html/test_complex"
+    exit 1
+fi
+
+# Paso 1: Backup de la base de datos
+echo "📦 Paso 1: Creando backup de la base de datos..."
 mkdir -p backups
 if [ -f "database/banco_preguntas.db" ]; then
-    BACKUP_FILE="backups/banco_preguntas_backup_$(date +%Y%m%d_%H%M%S).db"
+    BACKUP_FILE="backups/backup_antes_update_$(date +%Y%m%d_%H%M%S).db"
     cp database/banco_preguntas.db "$BACKUP_FILE"
-    gzip -f "$BACKUP_FILE"
+    gzip "$BACKUP_FILE"
     echo "✅ Backup creado: ${BACKUP_FILE}.gz"
 else
-    echo "⚠️  No se encontró base de datos para hacer backup"
+    echo "⚠️  No se encontró la base de datos para hacer backup"
+fi
+echo ""
+
+# Paso 2: Actualizar código desde GitHub
+echo "📥 Paso 2: Actualizando código desde GitHub..."
+git fetch origin
+if [ $? -ne 0 ]; then
+    echo "❌ Error al hacer fetch de GitHub"
+    exit 1
 fi
 
-# 2. Detener servidor
-echo ""
-echo "🛑 Deteniendo servidor..."
-pm2 stop banco-preguntas-api || echo "⚠️  Servidor no estaba corriendo"
+# Verificar si hay cambios locales
+if [ -n "$(git status --porcelain)" ]; then
+    echo "⚠️  Hay cambios locales. Guardando temporalmente..."
+    git stash
+    STASHED=true
+else
+    STASHED=false
+fi
 
-# 3. Actualizar código desde GitHub
-echo ""
-echo "📥 Actualizando código desde GitHub..."
-git stash 2>/dev/null || true
 git pull origin main
+if [ $? -ne 0 ]; then
+    echo "❌ Error al hacer pull de GitHub"
+    if [ "$STASHED" = true ]; then
+        git stash pop
+    fi
+    exit 1
+fi
 
-# 4. Instalar dependencias
+if [ "$STASHED" = true ]; then
+    echo "📝 Aplicando cambios locales guardados..."
+    git stash pop
+fi
+echo "✅ Código actualizado"
 echo ""
-echo "📦 Instalando dependencias del backend..."
-npm install --production
 
-echo "📦 Instalando dependencias del frontend..."
+# Paso 3: Instalar dependencias del backend
+echo "📦 Paso 3: Instalando dependencias del backend..."
+npm install
+if [ $? -ne 0 ]; then
+    echo "❌ Error al instalar dependencias del backend"
+    exit 1
+fi
+echo "✅ Dependencias del backend instaladas"
+echo ""
+
+# Paso 4: Instalar dependencias del frontend
+echo "📦 Paso 4: Instalando dependencias del frontend..."
 cd frontend
 npm install
-echo "🏗️  Construyendo frontend..."
-npm run build
-cd ..
-
-# 5. Restaurar backup desde GitHub
+if [ $? -ne 0 ]; then
+    echo "❌ Error al instalar dependencias del frontend"
+    exit 1
+fi
+echo "✅ Dependencias del frontend instaladas"
 echo ""
-echo "📥 Descargando backup desde GitHub..."
-curl -f -o backups/banco_preguntas_latest.db.gz https://raw.githubusercontent.com/cto-ulpik/test_complex/main/backups/banco_preguntas_latest.db.gz
 
-if [ $? -eq 0 ]; then
-    echo "✅ Backup descargado"
-    echo "📦 Descomprimiendo backup..."
-    gunzip -f backups/banco_preguntas_latest.db.gz
-    
-    echo "💾 Restaurando base de datos..."
-    mkdir -p database
-    cp backups/banco_preguntas_latest.db database/banco_preguntas.db
-    chmod 644 database/banco_preguntas.db
-    
-    # Verificar contenido
-    if command -v sqlite3 &> /dev/null; then
-        echo ""
-        echo "📊 Verificando base de datos restaurada:"
-        sqlite3 database/banco_preguntas.db << 'SQL'
-SELECT 
-    (SELECT COUNT(*) FROM materias) as materias,
-    (SELECT COUNT(*) FROM preguntas) as preguntas,
-    (SELECT COUNT(*) FROM respuestas) as respuestas;
-SQL
-    fi
+# Paso 5: Reconstruir frontend
+echo "🔨 Paso 5: Reconstruyendo frontend..."
+npm run build
+if [ $? -ne 0 ]; then
+    echo "❌ Error al construir el frontend"
+    exit 1
+fi
+echo "✅ Frontend reconstruido"
+cd ..
+echo ""
+
+# Paso 6: Reiniciar servidor
+echo "🔄 Paso 6: Reiniciando servidor..."
+pm2 restart banco-preguntas-api
+if [ $? -ne 0 ]; then
+    echo "❌ Error al reiniciar el servidor"
+    exit 1
+fi
+echo "✅ Servidor reiniciado"
+echo ""
+
+# Paso 7: Verificar estado
+echo "🔍 Paso 7: Verificando estado del servidor..."
+sleep 2
+pm2 status
+echo ""
+
+# Verificar endpoints
+echo "🔍 Verificando endpoints..."
+sleep 1
+if curl -s http://localhost:5001/api/materias > /dev/null; then
+    echo "✅ Endpoint /api/materias funciona"
 else
-    echo "⚠️  No se pudo descargar el backup desde GitHub"
-    echo "   La base de datos actual se mantendrá"
+    echo "❌ Error: Endpoint /api/materias no responde"
 fi
 
-# 6. Reiniciar servidor
+if curl -s http://localhost:5001/api/estadisticas > /dev/null; then
+    echo "✅ Endpoint /api/estadisticas funciona"
+else
+    echo "❌ Error: Endpoint /api/estadisticas no responde"
+fi
 echo ""
-echo "🚀 Reiniciando servidor..."
-pm2 restart banco-preguntas-api || pm2 start server.js --name "banco-preguntas-api" --env production
-pm2 save
 
-# 7. Verificar estado
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║     ✅ ACTUALIZACIÓN COMPLETADA                               ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
-echo "📊 Estado del servidor:"
-pm2 status
-
+echo "📋 Próximos pasos:"
+echo "   1. Verifica el sitio: https://complex.ulpik.com"
+echo "   2. Revisa los logs: pm2 logs banco-preguntas-api"
+echo "   3. Si hay problemas, restaura desde el backup creado"
 echo ""
-echo "✅ Actualización completada!"
-echo ""
-echo "🔍 Verificaciones:"
-echo "   1. Ver logs: pm2 logs banco-preguntas-api"
-echo "   2. Probar API: curl http://localhost:5001/api/materias"
-echo "   3. Acceder a: https://complex.ulpik.com"
-
