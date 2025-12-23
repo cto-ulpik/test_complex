@@ -11,17 +11,32 @@ echo "🚀 Configurando Banco de Preguntas en complex.ulpik.com..."
 PROJECT_DIR="/var/www/html/complex"
 REPO_URL="https://github.com/cto-ulpik/test_complex.git"
 
-# 1. Actualizar sistema
-echo "📦 Actualizando sistema..."
-apt update -y
+# 1. Actualizar sistema (opcional, continuar aunque falle)
+echo "📦 Intentando actualizar sistema..."
+apt update -y 2>/dev/null || echo "⚠️  Advertencia: No se pudo actualizar repositorios, continuando..."
 
 # 2. Instalar Node.js si no está instalado
 if ! command -v node &> /dev/null; then
     echo "📦 Instalando Node.js..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-    apt-get install -y nodejs
+    apt-get install -y nodejs 2>/dev/null || {
+        echo "⚠️  Error instalando Node.js desde repositorio, intentando método alternativo..."
+        # Método alternativo: descargar binario
+        NODE_VERSION="20.11.0"
+        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz
+        tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
+        rm /tmp/node.tar.xz
+    }
+else
+    echo "✅ Node.js ya está instalado: $(node --version)"
 fi
-echo "✅ Node.js $(node --version) instalado"
+
+if command -v node &> /dev/null; then
+    echo "✅ Node.js $(node --version) disponible"
+else
+    echo "❌ Error: No se pudo instalar Node.js"
+    exit 1
+fi
 
 # 3. Instalar PM2 globalmente
 if ! command -v pm2 &> /dev/null; then
@@ -33,9 +48,17 @@ echo "✅ PM2 instalado"
 # 4. Instalar Python3 y pip si no están
 if ! command -v python3 &> /dev/null; then
     echo "📦 Instalando Python3..."
-    apt-get install -y python3 python3-pip
+    apt-get install -y python3 python3-pip 2>/dev/null || {
+        echo "⚠️  No se pudo instalar Python3 desde repositorio"
+        echo "   Verifica que Python3 esté instalado manualmente"
+    }
 fi
-echo "✅ Python3 instalado"
+
+if command -v python3 &> /dev/null; then
+    echo "✅ Python3 $(python3 --version) disponible"
+else
+    echo "⚠️  Python3 no está disponible, algunos scripts pueden no funcionar"
+fi
 
 # 5. Crear directorio del proyecto
 echo "📁 Preparando directorio..."
@@ -99,7 +122,16 @@ echo "🌐 Configurando Nginx para complex.ulpik.com..."
 # Instalar Nginx si no está instalado
 if ! command -v nginx &> /dev/null; then
     echo "📦 Instalando Nginx..."
-    apt-get install -y nginx
+    apt-get install -y nginx 2>/dev/null || {
+        echo "⚠️  No se pudo instalar Nginx desde repositorio"
+        echo "   Verifica que Nginx esté instalado manualmente"
+    }
+fi
+
+if ! command -v nginx &> /dev/null; then
+    echo "❌ Error: Nginx no está instalado y no se pudo instalar"
+    echo "   Instala Nginx manualmente: apt-get install -y nginx"
+    exit 1
 fi
 
 # Crear configuración de Nginx SOLO para complex.ulpik.com
