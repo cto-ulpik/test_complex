@@ -10,4 +10,7 @@ marcado_ia.log
 server.log
 texto_extraido.txt
 *.pdf
+# Backups (se incluyen en git)
+!backups/
+!backups/*.db.gz
 
