@@ -122,3 +122,4 @@ tail -f /var/log/letsencrypt/letsencrypt.log
 - No requiere reiniciar Nginx después de la renovación
 - Es completamente gratuito
 
+

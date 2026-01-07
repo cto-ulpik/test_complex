@@ -217,6 +217,7 @@ function App() {
                 <MateriaList
                   materias={materias}
                   onSelect={handleMateriaSelect}
+                  onMateriaUpdated={fetchMaterias}
                 />
               )}
             </>

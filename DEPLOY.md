@@ -191,3 +191,4 @@ sudo certbot --nginx -d complex.ulpik.com
 - PM2 mantiene el proceso corriendo automáticamente
 - Los logs están disponibles con `pm2 logs`
 
+

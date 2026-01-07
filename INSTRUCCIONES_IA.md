@@ -36,3 +36,4 @@ El script:
 - El proceso puede tardar varias horas dependiendo del número de preguntas
 - Se recomienda ejecutarlo en background o durante la noche
 
+

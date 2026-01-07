@@ -1,7 +1,38 @@
-.materia-list h2 {
+.materia-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 1.5rem;
+}
+
+.materia-list h2 {
+  margin: 0;
   color: #333;
   font-size: 1.5rem;
+}
+
+.btn-toggle-edit-mode {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-toggle-edit-mode:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-toggle-edit-mode.active {
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
 }
 
 .materia-items {
@@ -24,8 +55,89 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
+.materia-name-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
 .materia-name {
   font-weight: 500;
   font-size: 1rem;
+  flex: 1;
 }
+
+.btn-edit-materia {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+  margin-left: 0.5rem;
+}
+
+.btn-edit-materia:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.materia-edit-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.materia-edit-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.materia-edit-input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: white;
+}
+
+.materia-edit-buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.btn-save-materia,
+.btn-cancel-materia {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s;
+  min-width: 40px;
+}
+
+.btn-save-materia:hover {
+  background: rgba(76, 175, 80, 0.8);
+}
+
+.btn-cancel-materia:hover {
+  background: rgba(244, 67, 54, 0.8);
+}
+
+.btn-save-materia:disabled,
+.btn-cancel-materia:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 

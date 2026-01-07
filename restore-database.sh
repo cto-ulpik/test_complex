@@ -76,3 +76,4 @@ pm2 restart banco-preguntas-api
 echo ""
 echo "✅ Base de datos restaurada y servidor reiniciado"
 
+

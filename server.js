@@ -34,6 +34,29 @@ app.get('/api/materias', (req, res) => {
     });
 });
 
+// Actualizar nombre de una materia
+app.put('/api/materias/:id', (req, res) => {
+    const materiaId = req.params.id;
+    const { nombre } = req.body;
+    
+    if (!nombre || nombre.trim() === '') {
+        res.status(400).json({ error: 'El nombre de la materia es requerido' });
+        return;
+    }
+    
+    db.run('UPDATE materias SET nombre = ? WHERE id = ?', [nombre.trim(), materiaId], function(err) {
+        if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+        }
+        if (this.changes === 0) {
+            res.status(404).json({ error: 'Materia no encontrada' });
+            return;
+        }
+        res.json({ success: true, message: 'Materia actualizada correctamente' });
+    });
+});
+
 // Obtener preguntas de una materia
 app.get('/api/materias/:materiaId/preguntas', (req, res) => {
     const materiaId = req.params.materiaId;

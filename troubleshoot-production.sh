@@ -110,3 +110,4 @@ echo "  gunzip backups/banco_preguntas_latest.db.gz"
 echo "  cp backups/banco_preguntas_latest.db database/banco_preguntas.db"
 echo "  pm2 restart banco-preguntas-api"
 
+
